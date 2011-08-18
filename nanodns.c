@@ -10,17 +10,12 @@ typedef struct {
 
 extern int printf (__const char *__restrict __format, ...);
 extern int close (int __fd);
-
-void bzero(char *a, int l) {
-	int i;
-	for (i = 0; i < l; i++)
-		a[i] = 0;
-}
+extern void bzero(void *t, size_t l);
 
 int listenUdp(int port) {
 	int sock = socket(AF_INET, SOCK_DGRAM, 0);
 	struct sockaddr_in sockaddr;
-	bzero((char*)&sockaddr, sizeof(sockaddr));
+	bzero(&sockaddr, sizeof(sockaddr));
 	sockaddr.sin_family = AF_INET;
 	sockaddr.sin_port = htons(port);
 	if (bind(sock, (struct sockaddr*)&sockaddr, sizeof(sockaddr)) == 0)
