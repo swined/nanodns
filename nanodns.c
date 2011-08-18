@@ -6,7 +6,17 @@ typedef struct {
 	unsigned short id;
 	unsigned char a, b;
 	unsigned short qd, an, ns, ar;
+	unsigned char data[512];
 } DnsHeader;
+
+typedef struct {
+	char *name;
+} Zone;
+
+typedef struct {
+	unsigned int count;
+	Zone *zones;
+} Zones;
 
 extern int printf (__const char *__restrict __format, ...);
 extern int close (int __fd);
@@ -26,40 +36,31 @@ int listenUdp(int port) {
 	}
 }
 
-int getOpcode(DnsHeader *header) {
+char getOpcode(DnsHeader *header) {
 	return (header->a >> 4) & 7;
 }
 
 int main(int a, char **b) {
 	int sock = listenUdp(53);
-	uint32_t i, j, k;
-	char q[512];
+	uint32_t i;
 	struct sockaddr_in d;
-	DnsHeader *header;
+	DnsHeader header;
 	socklen_t f = 511;
 	if (sock < 0) {
 		printf("bind() failed\n");
 		return 1;
 	}
 	for (;;) {
-		i = recvfrom(sock, q, 255, 0, (struct sockaddr*)&d, &f);
-		header = (DnsHeader*)q;
+		i = recvfrom(sock, &header, 255, 0, (struct sockaddr*)&d, &f);
 		printf("id=%d opcode=%d qd=%d an=%d ns=%d ar=%d\n",
-			ntohs(header->id),
-			getOpcode(header),
-			ntohs(header->qd),
-			ntohs(header->an),
-			ntohs(header->ns),
-			ntohs(header->ar)
+			ntohs(header.id),
+			getOpcode(&header),
+			ntohs(header.qd),
+			ntohs(header.an),
+			ntohs(header.ns),
+			ntohs(header.ar)
 		);
-		j = sizeof(DnsHeader);
-		while (q[j]) {
-			for (k = 0; k < q[j]; k++)
-				printf("%c", q[j + k + 1]);
-			j += q[j] + 1;
-			printf(".");
-		}
-		printf("\n");
+		printf("%s\n", header.data);
 	}
 	close(sock);
 	return 0;
