@@ -13,11 +13,6 @@ typedef struct {
 	char *name;
 } Zone;
 
-typedef struct {
-	unsigned int count;
-	Zone *zones;
-} Zones;
-
 extern int printf (__const char *__restrict __format, ...);
 extern int close (int __fd);
 extern void bzero(void *t, size_t l);
@@ -34,6 +29,29 @@ int listenUdp(int port) {
 		close(sock);
 		return -1;
 	}
+}
+
+int dnsNameLen(char *name) {
+	int i = 0;
+	while (name[i])
+		i += name[i] + 1;
+	return i + 1;
+}
+
+int dnsNameEquals(char *a, char *b) {
+	int i;
+	if (a[0] != b[0])
+		return 0;
+	if (a[0] == 0)
+		return 1;
+	for (i = 0; i < a[0]; i++)
+		if (a[i + 1] != b[i + 1])
+			return 0;
+	return dnsNameEquals(&a[a[0]], &b[b[0]]);
+}
+
+int dnsNameEndsWith(char *name, char *end) {
+	return 0;
 }
 
 char getOpcode(DnsHeader *header) {
