@@ -1,6 +1,6 @@
 #include <arpa/inet.h>
 
-#define ZONE(name, recs) { (name), sizeof(def) / sizeof(Record), recs }
+#define ZONE(name, recs) { (name), sizeof(recs) / sizeof(Record), recs }
 
 #pragma pack(1)
 
@@ -37,10 +37,6 @@ Record zone_swined_net_ru[] = {
 Zone zones[] = {
 	ZONE("swined.net.ru", zone_swined_net_ru),
 	ZONE("xwined.net.ru", zone_swined_net_ru),
-	{ "ya.ru", 2, {
-		{ 1, 2, 3, "4", "5" },
-		{ 1, 2, 3, "4", "5" }
-	}}
 };
 
 int dnsNameEndsWith(char *name, char *end) {

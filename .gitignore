@@ -1,1 +1,4 @@
 nanodns
+*.i
+*.o
+*.s
