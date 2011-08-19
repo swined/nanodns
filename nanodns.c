@@ -31,29 +31,6 @@ int listenUdp(int port) {
 	}
 }
 
-int dnsNameLen(char *name) {
-	int i = 0;
-	while (name[i])
-		i += name[i] + 1;
-	return i + 1;
-}
-
-int dnsNameEquals(char *a, char *b) {
-	int i;
-	if (a[0] != b[0])
-		return 0;
-	if (a[0] == 0)
-		return 1;
-	for (i = 0; i < a[0]; i++)
-		if (a[i + 1] != b[i + 1])
-			return 0;
-	return dnsNameEquals(&a[a[0]], &b[b[0]]);
-}
-
-int dnsNameEndsWith(char *name, char *end) {
-	return 0;
-}
-
 char getOpcode(DnsHeader *header) {
 	return (header->a >> 4) & 7;
 }
