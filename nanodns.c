@@ -7,15 +7,22 @@
 #define DATA_SIZE	1024
 #define MSG_SIZE	DATA_SIZE + sizeof(DnsHeader)
 
+#define ERR_OK 0
+#define ERR_FORMAT 1
+#define ERR_SERVFAIL 2
+#define ERR_NXDOMAIN 3
+#define ERR_NOTIMPL 4
+#define ERR_REFUSED 5
+
 #define CLASS_IN	1
 
 #define TYPE_A               1
 #define TYPE_NS              2
-#define TYPE_CNAME           5
+/*#define TYPE_CNAME           5
 #define TYPE_SOA             6
 #define TYPE_PTR             12
 #define TYPE_MX              15
-#define TYPE_TXT             16
+#define TYPE_TXT             16*/
 
 #define ZONE(name, recs) { name, sizeof(recs) / sizeof(Record), recs }
 
@@ -34,7 +41,7 @@ typedef struct {
 } DnsMessage;
 
 typedef struct {
-	unsigned int type;
+	short type;
 	char *mask;
 	char *data;
 } Record;
@@ -45,9 +52,19 @@ typedef struct {
 	Record *records;
 } Zone;
 
-#define DEFAULT_NS { TYPE_NS, "", "ns0.swined.net.ru" }, { TYPE_NS, "", "ns1.swined.net.ru" }
+#define TTL 3600
+#define DEFAULT_NS { TYPE_NS, "", ".ns0.swined.net.ru" }, { TYPE_NS, "", ".ns1.swined.net.ru" }
 #define HOME_A { TYPE_A, "", "85.118.231.99" }
-#define FIRSTVDS_A { TYPE_A, "", "188.120.227.223" }, { TYPE_A, "", "62.109.23.110" }
+#define NSSRV_A_0 "188.120.227.223"
+#define NSSRV_A_1 "62.109.23.110"
+#define NSSRV_A { TYPE_A, "", NSSRV_A_0 }, { TYPE_A, "", NSSRV_A_1 }
+
+Record zone_swined_net_ru[] = {
+	DEFAULT_NS,
+	NSSRV_A,
+	{ TYPE_A, "ns0.", NSSRV_A_0 },
+	{ TYPE_A, "ns1.", NSSRV_A_1 },
+};
 
 Record zone_sw_vg[] = { 
 	DEFAULT_NS,
@@ -56,10 +73,11 @@ Record zone_sw_vg[] = {
 
 Record zone_swined_org[] = {
 	DEFAULT_NS,
-	FIRSTVDS_A,
+	NSSRV_A,
 };
 
 Zone zones[] = {
+	ZONE("swined.net.ru.", zone_swined_net_ru),
 	ZONE("sw.vg.", zone_sw_vg),
 	ZONE("swined.org.", zone_swined_org),
 };
@@ -116,10 +134,77 @@ Zone *findZone(char *query, char *sub) {
 	return 0;
 }
 
+int hasDirectMatch(Zone *zone, int type, char *sub) {
+	int i;
+	for (i = 0; i < zone->length; i++)
+		if ((strcmp(zone->records[i].mask, sub) == 0) && (zone->records[i].type == type))
+			return 1;
+	return 0;
+}
+
+short getType(char *query) {
+        return ntohs(*(short*)(query + strlen(query) + 1));
+}
+
+#define getClass(q) ntohs(*(short*)(q + strlen(q) + 3))
+
 int receive(int sock, DnsMessage *msg) {
 	socklen_t f = sizeof(struct sockaddr_in);
 	int r = recvfrom(sock, &msg->header, MSG_SIZE, 0, (struct sockaddr*)&msg->from, &f);
 	return (r >= sizeof(DnsHeader)) && (r < MSG_SIZE);
+}
+
+#define qrLength(q) strlen(q) + 5
+
+int rrLength(char *rr) {
+	return strlen(rr) + 11 + ntohs(*(short*)(rr + strlen(rr) + 9));
+}
+
+int rrCount(DnsMessage *msg) {
+	DnsHeader *h = &msg->header;
+	return ntohs(h->an) + ntohs(h->ns) + ntohs(h->ar);
+}
+
+int messageLength(DnsMessage *msg) {
+	int i, offset = 0;
+	for (i = 0; i < ntohs(msg->header.qd); i++)
+		offset += qrLength(msg->data + offset);
+	for (i = 0; i < rrCount(msg); i++)
+		offset += rrLength(msg->data + offset);
+	return offset;
+}
+
+void reply(int sock, DnsMessage *msg, int errCode, int aa) {
+	int op = (msg->header.a >> 3) & 7;
+	msg->header.a = 0x80 | (op << 3) | (aa ? 4 : 0);
+	msg->header.b = errCode & 0x0F;
+	sendto(sock, &msg->header, sizeof(DnsHeader) + messageLength(msg), 0, (struct sockaddr*)&msg->from, sizeof(struct sockaddr_in)); 
+}
+
+void append(DnsMessage *msg, Record *rec) {
+	int i, offset = messageLength(msg);
+	short *rdlen;
+	char *rddata;
+	strcpy(msg->data + offset, msg->data);
+	offset += strlen(msg->data) + 1;
+	*(short*)(msg->data + offset) = htons(rec->type);
+	*(short*)(msg->data + offset + 2) = htons(CLASS_IN);
+	*(int*)(msg->data + offset + 4) = htons(TTL);
+        rdlen = (short*)(msg->data + offset + 8);
+        rddata = msg->data + offset + 10;
+	switch (rec->type) {
+	case TYPE_A:
+		*rdlen = htons(4);
+		*(int*)rddata = inet_addr(rec->data);
+		break;
+	default:
+		*rdlen = htons(strlen(rec->data) + 1);
+		strcpy(rddata, rec->data);
+		for (i = 0; i < strlen(rddata); i++)
+			if (rddata[i] == '.')
+				rddata[i] = findChar(rddata + i + 1, '.');
+		break;
+	}
 }
 
 int main(int a, char **b) {
@@ -127,18 +212,33 @@ int main(int a, char **b) {
 	Zone *zone;
 	char sub[DATA_SIZE];
 	DnsMessage msg;
-	if (sock < 0) {
-		printf("bind() failed\n");
+	int i, type, direct;
+	if (sock < 0) 
 		return 1;
-	}
 	while (1) {
-		if (!receive(sock, &msg)) 
+		if (!receive(sock, &msg))  
 			continue;
-		printf("id=%d\n", ntohs(msg.header.id));
+		if ((ntohs(msg.header.qd) != 1) || (rrCount(&msg) != 0) || (msg.header.a & 0xFE) || msg.header.b || (getClass(msg.data) != 1)) {
+			reply(sock, &msg, ERR_NOTIMPL, 0);
+			continue;
+		}
 		zone = findZone(msg.data, sub);
-		if (zone)
-			printf("zone: '%s' sub: '%s'\n", zone->name, sub);
+		if (zone) {
+			type = getType(msg.data);
+			direct = hasDirectMatch(zone, type, sub);
+			for (i = 0; i < zone->length; i++) {
+				if (zone->records[i].type != type)
+					continue;
+				if ((direct ? strcmp(zone->records[i].mask, sub): strcmp(zone->records[i].mask, "*")) == 0) {
+					append(&msg, &zone->records[i]);
+					msg.header.an = htons(ntohs(msg.header.an) + 1);
+				}
+			}
+			reply(sock, &msg, ERR_OK, 1);
+		} else 
+			reply(sock, &msg, ERR_REFUSED, 0);
 	}	
 	close(sock);
 	return 0;
 }
+
