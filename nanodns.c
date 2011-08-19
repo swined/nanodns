@@ -8,7 +8,7 @@ typedef struct {
 	unsigned short id;
 	unsigned char a, b;
 	unsigned short qd, an, ns, ar;
-	unsigned char data[512];
+	char data[512];
 } DnsHeader;
 
 typedef struct {
@@ -97,12 +97,9 @@ int main(int a, char **b) {
 	int sock = listenUdp(53);
 	uint32_t i;
 	struct sockaddr_in d;
-	char dns[42];
+	Zone *zone;
 	DnsHeader header;
 	socklen_t f = 511;
-	strToDns(".swined.net.ru", dns);
-	for (i = 0; i < strlen(dns); i++)
-		printf("%c %d\n", dns[i], dns[i]);
 	if (sock < 0) {
 		printf("bind() failed\n");
 		return 1;
@@ -117,6 +114,9 @@ int main(int a, char **b) {
 			ntohs(header.ns),
 			ntohs(header.ar)
 		);
+		zone = findZone(header.data);
+		if (zone)
+			printf("zone: %s\n", zone->name);
 		printf("%s\n", header.data);
 	}
 	close(sock);
