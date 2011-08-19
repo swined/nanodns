@@ -36,8 +36,8 @@ Record zone_swined_net_ru[] = {
 };
 
 Zone zones[] = {
-	ZONE("swined.net.ru.", zone_swined_net_ru),
-	ZONE("xwined.net.ru.", zone_swined_net_ru),
+	ZONE(".swined.net.ru", zone_swined_net_ru),
+	ZONE(".xwined.net.ru", zone_swined_net_ru),
 };
 
 int findChar(char *s, char c) {
@@ -77,6 +77,20 @@ int listenUdp(int port) {
 
 char getOpcode(DnsHeader *header) {
 	return (header->a >> 4) & 7;
+}
+
+int zoneMatches(Zone *zone, char *query) {
+	char name[64];
+	strToDns(zone->name, name);
+	return dnsNameEndsWith(query, name);
+}
+
+Zone *findZone(char *query) {
+	int i, l = sizeof(zones) / sizeof(Zone);
+	for (i = 0; i < l; i++)
+		if (zoneMatches(&zones[i], query))
+			return &zones[i];
+	return 0;
 }
 
 int main(int a, char **b) {
