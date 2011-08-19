@@ -39,6 +39,13 @@ Zone zones[] = {
 	ZONE("xwined.net.ru.", zone_swined_net_ru),
 };
 
+int findChar(char *s, char c) {
+	int o = 0;
+	while (s[o] && (s[o] != c))
+		o++;
+	return o;
+}
+
 int dnsNameEndsWith(char *name, char *end) {
 	if (0 == strcmp(name, end))
 		return 1;
