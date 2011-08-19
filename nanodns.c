@@ -1,4 +1,18 @@
 #include <arpa/inet.h>
+#include <string.h>
+#include <strings.h>
+#include <unistd.h>
+#include <stdio.h>
+
+#define CLASS_IN	1
+
+#define TYPE_A               1
+#define TYPE_NS              2
+#define TYPE_CNAME           5
+#define TYPE_SOA             6
+#define TYPE_PTR             12
+#define TYPE_MX              15
+#define TYPE_TXT             16
 
 #define ZONE(name, recs) { name, sizeof(recs) / sizeof(Record), recs }
 
@@ -13,7 +27,6 @@ typedef struct {
 
 typedef struct {
 	unsigned int type;
-	unsigned int cls;
 	char *mask;
 	char *data;
 } Record;
@@ -24,19 +37,14 @@ typedef struct {
 	Record *records;
 } Zone;
 
-extern int printf (__const char *__restrict __format, ...);
-extern int close (int __fd);
-extern void bzero(void *t, size_t l);
-extern int strcmp(const char *s1, const char *s2);
-extern size_t strlen ( const char * str );
-
-Record zone_swined_net_ru[] = {
-	{ 1, 2, "4", "5" },
+Record zone_sw_vg[] = {
+	{ TYPE_NS, "@", "ns0.swined.net.ru" },
+	{ TYPE_NS, "@", "ns1.swined.net.ru" },
+	{ TYPE_A, "@", "85.118.231.99" },
 };
 
 Zone zones[] = {
-	ZONE(".xwined.net.ru", zone_swined_net_ru),
-	ZONE(".swined.net.ru", zone_swined_net_ru),
+	ZONE(".sw.vg", zone_sw_vg),
 };
 
 int findChar(char *s, char c) {
@@ -93,7 +101,7 @@ Zone *findZone(char *query) {
 }
 
 int main(int a, char **b) {
-	int sock = listenUdp(5300);
+	int sock = listenUdp(53);
 	uint32_t i;
 	struct sockaddr_in d;
 	Zone *zone;
