@@ -29,6 +29,7 @@ extern int printf (__const char *__restrict __format, ...);
 extern int close (int __fd);
 extern void bzero(void *t, size_t l);
 extern int strcmp(const char *s1, const char *s2);
+extern size_t strlen ( const char * str );
 
 Record zone_swined_net_ru[] = {
 	{ 1, 2, 3, "4", "5" },
@@ -44,6 +45,12 @@ int findChar(char *s, char c) {
 	while (s[o] && (s[o] != c))
 		o++;
 	return o;
+}
+
+void strToDns(char *str, char *dns) {
+	int i, l = strlen(str);
+	for (i = 0; i <= l; i++)
+		dns[i] = (str[i] == '.') ? (char)findChar(str + i + 1, '.') : str[i];
 }
 
 int dnsNameEndsWith(char *name, char *end) {
@@ -76,8 +83,12 @@ int main(int a, char **b) {
 	int sock = listenUdp(53);
 	uint32_t i;
 	struct sockaddr_in d;
+	char dns[42];
 	DnsHeader header;
 	socklen_t f = 511;
+	strToDns(".swined.net.ru", dns);
+	for (i = 0; i < strlen(dns); i++)
+		printf("%c %d\n", dns[i], dns[i]);
 	if (sock < 0) {
 		printf("bind() failed\n");
 		return 1;
