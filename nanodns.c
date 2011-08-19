@@ -18,8 +18,8 @@
 
 #define TYPE_A               1
 #define TYPE_NS              2
-/*#define TYPE_CNAME           5
-#define TYPE_SOA             6
+#define TYPE_CNAME           5
+/*#define TYPE_SOA             6
 #define TYPE_PTR             12
 #define TYPE_MX              15
 #define TYPE_TXT             16*/
@@ -54,10 +54,17 @@ typedef struct {
 
 #define TTL 3600
 #define DEFAULT_NS { TYPE_NS, "", ".ns0.swined.net.ru" }, { TYPE_NS, "", ".ns1.swined.net.ru" }
+#define GHS_CNAME { TYPE_CNAME, "*", ".ghs.google.com" }
 #define HOME_A { TYPE_A, "", "85.118.231.99" }
 #define NSSRV_A_0 "188.120.227.223"
 #define NSSRV_A_1 "62.109.23.110"
 #define NSSRV_A { TYPE_A, "", NSSRV_A_0 }, { TYPE_A, "", NSSRV_A_1 }
+
+Record zone_ghs[] = {
+	DEFAULT_NS,
+	NSSRV_A,
+	GHS_CNAME,
+};
 
 Record zone_swined_net_ru[] = {
 	DEFAULT_NS,
@@ -69,17 +76,27 @@ Record zone_swined_net_ru[] = {
 Record zone_sw_vg[] = { 
 	DEFAULT_NS,
 	HOME_A,
+	GHS_CNAME,
+	{ TYPE_A, "lms.", "216.208.29.154" },
 };
 
 Record zone_swined_org[] = {
 	DEFAULT_NS,
 	NSSRV_A,
+/*	{ TYPE_TXT, "", "v=spf1 include:aspmx.googlemail.com ~all" }, */
+	{ TYPE_CNAME, "blog.", ".ghs.google.com" },
+	{ TYPE_CNAME, "lr.", ".ghs.google.com" },
+	{ TYPE_CNAME, "ns.", ".swined.org" },
+
 };
 
 Zone zones[] = {
 	ZONE("swined.net.ru.", zone_swined_net_ru),
 	ZONE("sw.vg.", zone_sw_vg),
 	ZONE("swined.org.", zone_swined_org),
+	ZONE("proofpic.org.", zone_ghs),
+	ZONE("p-ic.org.", zone_ghs),
+	ZONE("prooflink.org.", zone_ghs),
 };
 
 int findChar(char *s, char c) {
@@ -131,14 +148,6 @@ Zone *findZone(char *query, char *sub) {
 	for (i = 0; i < l; i++)
 		if (match(&zones[i], query, sub))
 			return &zones[i];
-	return 0;
-}
-
-int hasDirectMatch(Zone *zone, int type, char *sub) {
-	int i;
-	for (i = 0; i < zone->length; i++)
-		if ((strcmp(zone->records[i].mask, sub) == 0) && (zone->records[i].type == type))
-			return 1;
 	return 0;
 }
 
@@ -197,14 +206,31 @@ void append(DnsMessage *msg, Record *rec) {
 		*rdlen = htons(4);
 		*(int*)rddata = inet_addr(rec->data);
 		break;
-	default:
+	case TYPE_NS:
+	case TYPE_CNAME:
 		*rdlen = htons(strlen(rec->data) + 1);
 		strcpy(rddata, rec->data);
 		for (i = 0; i < strlen(rddata); i++)
 			if (rddata[i] == '.')
 				rddata[i] = findChar(rddata + i + 1, '.');
 		break;
+	default:
+		*rdlen = 0;
 	}
+}
+
+int search(DnsMessage *msg, Zone *zone, char *sub, int type, int direct) {
+	int i, r = 0;
+	for (i = 0; i < zone->length; i++) {
+		if (zone->records[i].type != type)
+			continue;
+		if (strcmp(zone->records[i].mask, direct ? sub : "*") == 0) {
+			append(msg, &zone->records[i]);
+			msg->header.an = htons(ntohs(msg->header.an) + 1);
+			r = 1;
+		}
+	}
+	return r;
 }
 
 int main(int a, char **b) {
@@ -212,7 +238,7 @@ int main(int a, char **b) {
 	Zone *zone;
 	char sub[DATA_SIZE];
 	DnsMessage msg;
-	int i, type, direct;
+	int type;
 	if (sock < 0) 
 		return 1;
 	while (1) {
@@ -225,15 +251,8 @@ int main(int a, char **b) {
 		zone = findZone(msg.data, sub);
 		if (zone) {
 			type = getType(msg.data);
-			direct = hasDirectMatch(zone, type, sub);
-			for (i = 0; i < zone->length; i++) {
-				if (zone->records[i].type != type)
-					continue;
-				if ((direct ? strcmp(zone->records[i].mask, sub): strcmp(zone->records[i].mask, "*")) == 0) {
-					append(&msg, &zone->records[i]);
-					msg.header.an = htons(ntohs(msg.header.an) + 1);
-				}
-			}
+			if (!search(&msg, zone, sub, type, 1))
+				search(&msg, zone, sub, type, 0);
 			reply(sock, &msg, ERR_OK, 1);
 		} else 
 			reply(sock, &msg, ERR_REFUSED, 0);
