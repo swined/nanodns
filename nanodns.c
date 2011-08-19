@@ -83,11 +83,8 @@ Record zone_sw_vg[] = {
 Record zone_swined_org[] = {
 	DEFAULT_NS,
 	NSSRV_A,
-/*	{ TYPE_TXT, "", "v=spf1 include:aspmx.googlemail.com ~all" }, */
 	{ TYPE_CNAME, "blog.", ".ghs.google.com" },
 	{ TYPE_CNAME, "lr.", ".ghs.google.com" },
-	{ TYPE_CNAME, "ns.", ".swined.org" },
-
 };
 
 Zone zones[] = {
