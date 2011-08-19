@@ -4,6 +4,9 @@
 #include <unistd.h>
 #include <stdio.h>
 
+#define DATA_SIZE	1024
+#define MSG_SIZE	DATA_SIZE + sizeof(DnsHeader)
+
 #define CLASS_IN	1
 
 #define TYPE_A               1
@@ -22,8 +25,13 @@ typedef struct {
 	unsigned short id;
 	unsigned char a, b;
 	unsigned short qd, an, ns, ar;
-	char data[512];
 } DnsHeader;
+
+typedef struct {
+	struct sockaddr_in from;
+	DnsHeader header;
+	char data[DATA_SIZE];
+} DnsMessage;
 
 typedef struct {
 	unsigned int type;
@@ -37,14 +45,23 @@ typedef struct {
 	Record *records;
 } Zone;
 
-Record zone_sw_vg[] = {
-	{ TYPE_NS, "@", "ns0.swined.net.ru" },
-	{ TYPE_NS, "@", "ns1.swined.net.ru" },
-	{ TYPE_A, "@", "85.118.231.99" },
+#define DEFAULT_NS { TYPE_NS, "", "ns0.swined.net.ru" }, { TYPE_NS, "", "ns1.swined.net.ru" }
+#define HOME_A { TYPE_A, "", "85.118.231.99" }
+#define FIRSTVDS_A { TYPE_A, "", "188.120.227.223" }, { TYPE_A, "", "62.109.23.110" }
+
+Record zone_sw_vg[] = { 
+	DEFAULT_NS,
+	HOME_A,
+};
+
+Record zone_swined_org[] = {
+	DEFAULT_NS,
+	FIRSTVDS_A,
 };
 
 Zone zones[] = {
 	ZONE("sw.vg.", zone_sw_vg),
+	ZONE("swined.org.", zone_swined_org),
 };
 
 int findChar(char *s, char c) {
@@ -99,25 +116,29 @@ Zone *findZone(char *query, char *sub) {
 	return 0;
 }
 
+int receive(int sock, DnsMessage *msg) {
+	socklen_t f = sizeof(struct sockaddr_in);
+	int r = recvfrom(sock, &msg->header, MSG_SIZE, 0, (struct sockaddr*)&msg->from, &f);
+	return (r >= sizeof(DnsHeader)) && (r < MSG_SIZE);
+}
+
 int main(int a, char **b) {
 	int sock = listenUdp(53);
-	uint32_t i;
-	struct sockaddr_in d;
 	Zone *zone;
-	char sub[512];
-	DnsHeader header;
-	socklen_t f = 511;
+	char sub[DATA_SIZE];
+	DnsMessage msg;
 	if (sock < 0) {
 		printf("bind() failed\n");
 		return 1;
 	}
-	for (;;) {
-		i = recvfrom(sock, &header, 255, 0, (struct sockaddr*)&d, &f);
-		printf("id=%d\n", ntohs(header.id));
-		zone = findZone(header.data, sub);
+	while (1) {
+		if (!receive(sock, &msg)) 
+			continue;
+		printf("id=%d\n", ntohs(msg.header.id));
+		zone = findZone(msg.data, sub);
 		if (zone)
 			printf("zone: '%s' sub: '%s'\n", zone->name, sub);
-	}
+	}	
 	close(sock);
 	return 0;
 }
