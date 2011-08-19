@@ -1,6 +1,6 @@
 #include <arpa/inet.h>
 
-#define ZONE(name, recs) { (name), sizeof(recs) / sizeof(Record), recs }
+#define ZONE(name, recs) { name, sizeof(recs) / sizeof(Record), recs }
 
 #pragma pack(1)
 
@@ -14,9 +14,8 @@ typedef struct {
 typedef struct {
 	unsigned int type;
 	unsigned int cls;
-	unsigned int len; 
-	unsigned char mask[16];
-	unsigned char data[16];
+	char *mask;
+	char *data;
 } Record;
 
 typedef struct {
@@ -32,12 +31,12 @@ extern int strcmp(const char *s1, const char *s2);
 extern size_t strlen ( const char * str );
 
 Record zone_swined_net_ru[] = {
-	{ 1, 2, 3, "4", "5" },
+	{ 1, 2, "4", "5" },
 };
 
 Zone zones[] = {
-	ZONE(".swined.net.ru", zone_swined_net_ru),
 	ZONE(".xwined.net.ru", zone_swined_net_ru),
+	ZONE(".swined.net.ru", zone_swined_net_ru),
 };
 
 int findChar(char *s, char c) {
@@ -94,7 +93,7 @@ Zone *findZone(char *query) {
 }
 
 int main(int a, char **b) {
-	int sock = listenUdp(53);
+	int sock = listenUdp(5300);
 	uint32_t i;
 	struct sockaddr_in d;
 	Zone *zone;
