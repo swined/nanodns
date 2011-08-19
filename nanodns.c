@@ -31,12 +31,12 @@ extern void bzero(void *t, size_t l);
 extern int strcmp(const char *s1, const char *s2);
 
 Record zone_swined_net_ru[] = {
-	{ 1, 2, 3, "4", "5" }
+	{ 1, 2, 3, "4", "5" },
 };
 
 Zone zones[] = {
-	ZONE("swined.net.ru", zone_swined_net_ru),
-	ZONE("xwined.net.ru", zone_swined_net_ru),
+	ZONE("swined.net.ru.", zone_swined_net_ru),
+	ZONE("xwined.net.ru.", zone_swined_net_ru),
 };
 
 int dnsNameEndsWith(char *name, char *end) {
