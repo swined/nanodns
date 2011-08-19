@@ -44,7 +44,7 @@ Record zone_sw_vg[] = {
 };
 
 Zone zones[] = {
-	ZONE(".sw.vg", zone_sw_vg),
+	ZONE("sw.vg.", zone_sw_vg),
 };
 
 int findChar(char *s, char c) {
@@ -54,18 +54,15 @@ int findChar(char *s, char c) {
 	return o;
 }
 
-void strToDns(char *str, char *dns) {
-	int i, l = strlen(str);
-	for (i = 0; i <= l; i++)
-		dns[i] = (str[i] == '.') ? (char)findChar(str + i + 1, '.') : str[i];
-}
-
-int dnsNameEndsWith(char *name, char *end) {
-	if (0 == strcmp(name, end))
-		return 1;
-	if (0 == name[0])
+int qnameEqualsStr(char *name, char *str) {
+	int so = findChar(str, '.');
+	if (so != name[0])
 		return 0;
-	return dnsNameEndsWith(&(name[name[0]+1]), end);
+	if (so == 0)
+		return 1;
+	if (strncmp(name + 1, str, so) != 0)
+		return 0;
+	return qnameEqualsStr(name + so + 1, str + so + 1);
 }
 
 int listenUdp(int port) {
@@ -82,20 +79,22 @@ int listenUdp(int port) {
 	}
 }
 
-char getOpcode(DnsHeader *header) {
-	return (header->a >> 4) & 7;
+int match(Zone *zone, char *query, char *sub) {
+	int len = query[0];
+	sub[0] = 0;
+	if (!len)
+		return 0;
+	if (qnameEqualsStr(query, zone->name))
+		return 1;
+	strncpy(sub, query + 1, len);
+	sub[len] = '.';
+	return match(zone, query + len + 1, sub + len + 1);
 }
 
-int zoneMatches(Zone *zone, char *query) {
-	char name[64];
-	strToDns(zone->name, name);
-	return dnsNameEndsWith(query, name);
-}
-
-Zone *findZone(char *query) {
+Zone *findZone(char *query, char *sub) {
 	int i, l = sizeof(zones) / sizeof(Zone);
 	for (i = 0; i < l; i++)
-		if (zoneMatches(&zones[i], query))
+		if (match(&zones[i], query, sub))
 			return &zones[i];
 	return 0;
 }
@@ -105,6 +104,7 @@ int main(int a, char **b) {
 	uint32_t i;
 	struct sockaddr_in d;
 	Zone *zone;
+	char sub[512];
 	DnsHeader header;
 	socklen_t f = 511;
 	if (sock < 0) {
@@ -113,18 +113,10 @@ int main(int a, char **b) {
 	}
 	for (;;) {
 		i = recvfrom(sock, &header, 255, 0, (struct sockaddr*)&d, &f);
-		printf("id=%d opcode=%d qd=%d an=%d ns=%d ar=%d\n",
-			ntohs(header.id),
-			getOpcode(&header),
-			ntohs(header.qd),
-			ntohs(header.an),
-			ntohs(header.ns),
-			ntohs(header.ar)
-		);
-		zone = findZone(header.data);
+		printf("id=%d\n", ntohs(header.id));
+		zone = findZone(header.data, sub);
 		if (zone)
-			printf("zone: %s\n", zone->name);
-		printf("%s\n", header.data);
+			printf("zone: '%s' sub: '%s'\n", zone->name, sub);
 	}
 	close(sock);
 	return 0;
