@@ -17,12 +17,6 @@ typedef struct {
 	unsigned char data[16];
 } Record;
 
-typedef struct {
-	char name[16];
-	unsigned int length;
-	Record records[0];
-} Zone;
-
 extern int printf (__const char *__restrict __format, ...);
 extern int close (int __fd);
 extern void bzero(void *t, size_t l);
