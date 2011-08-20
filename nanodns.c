@@ -10,7 +10,13 @@ typedef struct {
 } DnsHeader;
 
 typedef struct {
+	char *mask;
+} Record;
+
+typedef struct {
 	char *name;
+	unsigned int length;
+	Record *records;
 } Zone;
 
 extern int printf (__const char *__restrict __format, ...);
