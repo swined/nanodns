@@ -11,6 +11,9 @@ typedef struct {
 
 typedef struct {
 	char *mask;
+	int type;
+	int cls;
+	char *data;
 } Record;
 
 typedef struct {
