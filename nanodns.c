@@ -10,16 +10,17 @@ typedef struct {
 } DnsHeader;
 
 typedef struct {
-	int type;
-	int cls;
-	char mask[16];
-	char data[16];
+	unsigned int type;
+	unsigned int cls;
+	unsigned int len; 
+	unsigned char mask[16];
+	unsigned char data[16];
 } Record;
 
 typedef struct {
 	char name[16];
 	unsigned int length;
-	Record *records;
+	Record records[0];
 } Zone;
 
 extern int printf (__const char *__restrict __format, ...);
