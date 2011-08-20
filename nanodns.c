@@ -32,6 +32,10 @@ Record zone_swined_net_ru[] = {
 	{ 1, 2, 3, "4", "5" }
 };
 
+Zone zones[] = {
+	{ "swined.net.ru", sizeof(zone_swined_net_ru) / sizeof(Record), &zone_swined_net_ru }
+};
+
 int dnsNameEndsWith(char *name, char *end) {
 	if (0 == strcmp(name, end))
 		return 1;
