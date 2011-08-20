@@ -26,6 +26,14 @@ extern int printf (__const char *__restrict __format, ...);
 extern int close (int __fd);
 extern void bzero(void *t, size_t l);
 
+int dnsNameEndsWith(char *name, char *end) {
+	if (0 == strcmp(name, end))
+		return 1;
+	if (0 == name[0])
+		return 0;
+	return strcmp(&(name[name[0]+1]), end);
+}
+
 int listenUdp(int port) {
 	int sock = socket(AF_INET, SOCK_DGRAM, 0);
 	struct sockaddr_in sockaddr;
