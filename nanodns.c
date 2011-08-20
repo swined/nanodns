@@ -35,7 +35,11 @@ Record zone_swined_net_ru[] = {
 };
 
 Zone zones[] = {
-	ZONE("swined.net.ru", zone_swined_net_ru)
+	ZONE("swined.net.ru", zone_swined_net_ru),
+	{ "ya.ru", 2, {
+		{ 1, 2, 3, "4", "5" },
+		{ 1, 2, 3, "4", "5" }
+	}}
 };
 
 int dnsNameEndsWith(char *name, char *end) {
