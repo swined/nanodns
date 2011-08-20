@@ -10,14 +10,14 @@ typedef struct {
 } DnsHeader;
 
 typedef struct {
-	char *mask;
 	int type;
 	int cls;
-	char *data;
+	char mask[16];
+	char data[16];
 } Record;
 
 typedef struct {
-	char *name;
+	char name[16];
 	unsigned int length;
 	Record *records;
 } Zone;
