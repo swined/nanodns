@@ -25,6 +25,7 @@ typedef struct {
 extern int printf (__const char *__restrict __format, ...);
 extern int close (int __fd);
 extern void bzero(void *t, size_t l);
+extern int strcmp(const char *s1, const char *s2);
 
 int dnsNameEndsWith(char *name, char *end) {
 	if (0 == strcmp(name, end))
