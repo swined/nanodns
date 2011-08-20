@@ -32,7 +32,7 @@ int dnsNameEndsWith(char *name, char *end) {
 		return 1;
 	if (0 == name[0])
 		return 0;
-	return strcmp(&(name[name[0]+1]), end);
+	return dnsNameEndsWith(&(name[name[0]+1]), end);
 }
 
 int listenUdp(int port) {
