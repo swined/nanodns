@@ -28,6 +28,10 @@ extern int close (int __fd);
 extern void bzero(void *t, size_t l);
 extern int strcmp(const char *s1, const char *s2);
 
+Record zone_swined_net_ru[] = {
+	{ 1, 2, 3, "4", "5" }
+};
+
 int dnsNameEndsWith(char *name, char *end) {
 	if (0 == strcmp(name, end))
 		return 1;
