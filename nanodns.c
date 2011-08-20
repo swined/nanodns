@@ -230,30 +230,36 @@ int search(DnsMessage *msg, Zone *zone, char *sub, int type, int direct) {
 	return r;
 }
 
+void run(int sock) {
+        Zone *zone;
+        char sub[DATA_SIZE];
+        DnsMessage msg;
+        int type;
+        while (1) {
+                if (!receive(sock, &msg))
+                        continue;
+                if ((ntohs(msg.header.qd) != 1) || (rrCount(&msg) != 0) || (msg.header.a & 0xFE) || msg.header.b || (getClass(msg.data) != 1)) {
+                        reply(sock, &msg, ERR_NOTIMPL, 0);
+                        continue;
+                }
+                zone = findZone(msg.data, sub);
+                if (zone) {
+                        type = getType(msg.data);
+                        if (!search(&msg, zone, sub, type, 1))
+                                search(&msg, zone, sub, type, 0);
+                        reply(sock, &msg, ERR_OK, 1);
+                } else
+                        reply(sock, &msg, ERR_REFUSED, 0);
+        } 
+}
+
 int main(int a, char **b) {
-	int sock = listenUdp(53);
-	Zone *zone;
-	char sub[DATA_SIZE];
-	DnsMessage msg;
-	int type;
-	if (sock < 0) 
-		return 1;
-	while (1) {
-		if (!receive(sock, &msg))  
-			continue;
-		if ((ntohs(msg.header.qd) != 1) || (rrCount(&msg) != 0) || (msg.header.a & 0xFE) || msg.header.b || (getClass(msg.data) != 1)) {
-			reply(sock, &msg, ERR_NOTIMPL, 0);
-			continue;
-		}
-		zone = findZone(msg.data, sub);
-		if (zone) {
-			type = getType(msg.data);
-			if (!search(&msg, zone, sub, type, 1))
-				search(&msg, zone, sub, type, 0);
-			reply(sock, &msg, ERR_OK, 1);
-		} else 
-			reply(sock, &msg, ERR_REFUSED, 0);
-	}	
+	int sock;
+	if (fork())
+		return 0;
+	sock = listenUdp(53);
+	if (sock) 
+		run(sock);
 	close(sock);
 	return 0;
 }
