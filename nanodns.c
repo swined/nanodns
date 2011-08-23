@@ -11,7 +11,7 @@
 #include "config.h"
 #include "const.h"
 
-// #define DEBUG 
+//#define DEBUG 
 
 #define DATA_SIZE	1024
 #define MSG_SIZE	DATA_SIZE + sizeof(DnsHeader)
@@ -29,7 +29,10 @@ typedef struct {
 	uint16_t class;
 	uint32_t ttl;
 	uint16_t length;
-	char data[0];
+	union {
+		uint32_t i;
+		char d[0];	
+	} data;
 } Answer;
 
 typedef struct {
@@ -153,15 +156,15 @@ void append(DnsMessage *msg, char *query, Record *rec) {
 	answer->class = htons(CLASS_IN);
 	answer->ttl = htonl(TTL);
 	switch (rec->type) {
-	case TYPE_A:
+	case ns_t_a:
 		answer->length = htons(4);
-		*(int*)(answer->data) = inet_addr(rec->data);
+		answer->data.i = inet_addr(rec->data);
 		break;
-	case TYPE_NS:
-	case TYPE_CNAME:
+	case ns_t_ns:
+	case ns_t_cname:
 		answer->length = htons(strlen(rec->data) + 1);
-		strcpy(answer->data, rec->data);
-		dots(answer->data);
+		strcpy(answer->data.d, rec->data);
+		dots(answer->data.d);
 		break;
 	default:
 		answer->length = 0;
@@ -171,17 +174,12 @@ void append(DnsMessage *msg, char *query, Record *rec) {
 
 int rrA(Record *rec, char *host) {	
 	struct addrinfo *r;
-	rec->type = TYPE_A;
+	rec->type = ns_t_a;
 	rec->mask = "<recursive>";
 	rec->data = "127.0.0.1";
 	if (getaddrinfo(host, NULL, NULL, &r))
 		return 0;
-	rec->data = inet_ntoa(
-			(
-				(struct sockaddr_in*)
-				(r->ai_addr)
-			)->sin_addr
-	);
+	rec->data = inet_ntoa(((struct sockaddr_in*)(r->ai_addr))->sin_addr);
 	freeaddrinfo(r);
 	return 1;
 }
@@ -205,7 +203,7 @@ int appendRecursiveA(DnsMessage *msg, char *host) {
 int search(DnsMessage *msg, Zone *zone, char *sub, int type, int direct, int fake) {
 	int i, r = 0;
 	for (i = 0; i < zone->length; i++) {
-		if (zone->records[i].type != (fake ? TYPE_CNAME : type))
+		if (zone->records[i].type != (fake ? ns_t_cname : type))
 			continue;
 		if (maskMatches(&zone->records[i], sub, direct)) {
 			append(msg, msg->data, &zone->records[i]);
@@ -220,7 +218,7 @@ int search(DnsMessage *msg, Zone *zone, char *sub, int type, int direct, int fak
 	if (!r) {
 		if (direct)
 			return search(msg, zone, sub, type, 0, fake);
-		if (!fake && (type == TYPE_A))
+		if (!fake && (type == ns_t_a))
 			return search(msg, zone, sub, type, 1, 1);
 	}
 	return r;

@@ -2,9 +2,10 @@
 #define _CONFIG_H
 
 #include <stdint.h>
+#include <arpa/nameser.h> 
 
 typedef struct {
-	uint16_t type;
+	ns_type type;
 	char *mask;
 	char *data;
 } Record;
