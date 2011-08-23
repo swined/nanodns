@@ -194,23 +194,27 @@ int maskMatches(Record *rec, char *sub, int direct) {
 	}
 }
 
-int search(DnsMessage *msg, Zone *zone, char *sub, int type, int direct, int fake) {
+int appendRecursiveA(DnsMessage *msg, char *host) {
 	Record recursive;
+	if (rrA(&recursive, host + 1)) {
+		append(msg, host, &recursive);
+		return 1;
+	} else return 0;
+}
+
+int search(DnsMessage *msg, Zone *zone, char *sub, int type, int direct, int fake) {
 	int i, r = 0;
 	for (i = 0; i < zone->length; i++) {
 		if (zone->records[i].type != (fake ? TYPE_CNAME : type))
 			continue;
 		if (maskMatches(&zone->records[i], sub, direct)) {
 			append(msg, msg->data, &zone->records[i]);
-			r++;
 			if (fake) {
-				if (!rrA(&recursive, zone->records[i].data + 1)) {
-					r--;
-					continue;
+				if (appendRecursiveA(msg, zone->records[i].data)) {
+					r++;
+					break;
 				}
-				append(msg, zone->records[i].data, &recursive);
-				break;
-			}
+			} else r++;
 		}
 	}
 	if (!r) {
