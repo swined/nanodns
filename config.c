@@ -1,5 +1,4 @@
 #include "config.h"
-#include "const.h"
 
 #define ZONE(name, recs) { name, sizeof(recs) / sizeof(Record), recs }
 

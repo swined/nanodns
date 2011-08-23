@@ -9,7 +9,6 @@
 #include <netdb.h>
 #include <stdlib.h>
 #include "config.h"
-#include "const.h"
 
 //#define DEBUG 
 
