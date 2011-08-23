@@ -3,6 +3,7 @@
 #include <strings.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <netdb.h>
 
 #define DATA_SIZE	1024
 #define MSG_SIZE	DATA_SIZE + sizeof(DnsHeader)
@@ -187,12 +188,12 @@ void reply(int sock, DnsMessage *msg, int errCode, int aa) {
 	sendto(sock, &msg->header, sizeof(DnsHeader) + messageLength(msg), 0, (struct sockaddr*)&msg->from, sizeof(struct sockaddr_in)); 
 }
 
-void append(DnsMessage *msg, Record *rec) {
+void append(DnsMessage *msg, char *query, Record *rec) {
 	int i, offset = messageLength(msg);
 	short *rdlen;
 	char *rddata;
-	strcpy(msg->data + offset, msg->data);
-	offset += strlen(msg->data) + 1;
+	strcpy(msg->data + offset, query);
+	offset += strlen(query) + 1;
 	*(short*)(msg->data + offset) = htons(rec->type);
 	*(short*)(msg->data + offset + 2) = htons(CLASS_IN);
 	*(int*)(msg->data + offset + 4) = htons(TTL);
@@ -214,18 +215,48 @@ void append(DnsMessage *msg, Record *rec) {
 	default:
 		*rdlen = 0;
 	}
+	msg->header.an = htons(ntohs(msg->header.an) + 1);
 }
 
-int search(DnsMessage *msg, Zone *zone, char *sub, int type, int direct) {
+int initFakeRec(Record *rec, char *data) {
+	struct hostent *he;
+	switch (rec->type) {
+		case TYPE_A: 
+			he = gethostbyname(data);
+			if (he)
+				strcpy(rec->data, inet_ntoa(*(struct in_addr*)(he->h_addr_list)));
+			return he != 0;
+		default: return 0;
+	}
+}
+
+int search(DnsMessage *msg, Zone *zone, char *sub, int type, int direct, int fake) {
+	char fakeData[DATA_SIZE];
+	Record fakeRec = { 0, "", 0 };
 	int i, r = 0;
+	fakeRec.type = type;
+	fakeRec.data = fakeData;
 	for (i = 0; i < zone->length; i++) {
-		if (zone->records[i].type != type)
+		if (zone->records[i].type != (fake ? TYPE_CNAME : type))
 			continue;
 		if (strcmp(zone->records[i].mask, direct ? sub : "*") == 0) {
-			append(msg, &zone->records[i]);
-			msg->header.an = htons(ntohs(msg->header.an) + 1);
-			r = 1;
+			append(msg, msg->data, &zone->records[i]);
+			r++;
+			if (fake) {
+				if (!initFakeRec(&fakeRec, zone->records[i].data + 1)) {
+					r--;
+					continue;
+				}
+				append(msg, zone->records[i].data + 1, &fakeRec);
+				break;
+			}
 		}
+	}
+	if (!r) {
+		if (direct)
+			return search(msg, zone, sub, type, 0, fake);
+		if (!fake && (type != TYPE_CNAME))
+			return search(msg, zone, sub, type, 1, 1);
 	}
 	return r;
 }
@@ -245,8 +276,7 @@ void run(int sock) {
                 zone = findZone(msg.data, sub);
                 if (zone) {
                         type = getType(msg.data);
-                        if (!search(&msg, zone, sub, type, 1))
-                                search(&msg, zone, sub, type, 0);
+                        search(&msg, zone, sub, type, 1, 0);
                         reply(sock, &msg, ERR_OK, 1);
                 } else
                         reply(sock, &msg, ERR_REFUSED, 0);
