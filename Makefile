@@ -1,2 +1,2 @@
 build:
-	gcc -ansi -pedantic -Werror -Wall *.c -o nanodns
+	gcc -Werror -Wall *.c -o nanodns

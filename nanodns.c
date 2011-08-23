@@ -1,9 +1,13 @@
 #include <arpa/inet.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <netdb.h>
+#include <stdlib.h>
 #include "config.h"
 #include "const.h"
 
@@ -165,14 +169,21 @@ void append(DnsMessage *msg, char *query, Record *rec) {
 	msg->header.an = htons(ntohs(msg->header.an) + 1);
 }
 
-int rrA(Record *rec, char *domain) {
-	struct hostent *he = gethostbyname(domain);
+int rrA(Record *rec, char *host) {	
+	struct addrinfo *r;
 	rec->type = TYPE_A;
-	rec->mask = "";
-	if (he)
-		rec->data = inet_ntoa(*(struct in_addr*)(he->h_addr_list));
-	return he != 0;
-		
+	rec->mask = "<recursive>";
+	rec->data = "127.0.0.1";
+	if (getaddrinfo(host, NULL, NULL, &r))
+		return 0;
+	rec->data = inet_ntoa(
+			(
+				(struct sockaddr_in*)
+				(r->ai_addr)
+			)->sin_addr
+	);
+	freeaddrinfo(r);
+	return 1;
 }
 
 int maskMatches(Record *rec, char *sub, int direct) {
