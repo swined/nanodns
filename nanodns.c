@@ -153,7 +153,7 @@ void append(DnsMessage *msg, char *query, Record *rec) {
 	offset += strlen(query) + 1;
 	answer = (Answer*)(msg->data + offset);
 	answer->type = htons(rec->type);
-	answer->class = htons(CLASS_IN);
+	answer->class = htons(ns_c_in);
 	answer->ttl = htonl(TTL);
 	switch (rec->type) {
 	case ns_t_a:
@@ -232,7 +232,7 @@ void run(int sock) {
                 if (!receive(sock, &msg))
                         continue;
                 if ((ntohs(msg.header.qd) != 1) || (rrCount(&msg) != 0) || (msg.header.a & 0xFE) || msg.header.b || (getClass(msg.data) != 1)) {
-                        reply(sock, &msg, ERR_NOTIMPL, 0);
+                        reply(sock, &msg, ns_r_notimpl, 0);
                         continue;
                 }
 		#ifdef DEBUG
@@ -244,12 +244,12 @@ void run(int sock) {
 			printf("zone: %s\n", zone->name);
 			#endif
                         search(&msg, zone, sub, getType(msg.data), 1, 0);
-                        reply(sock, &msg, ERR_OK, 1);
+                        reply(sock, &msg, ns_r_noerror, 1);
                 } else {
 			#ifdef DEBUG
 			printf("no zone\n");
 			#endif
-                        reply(sock, &msg, ERR_REFUSED, 0);
+                        reply(sock, &msg, ns_r_refused, 0);
 		}
         } 
 }
