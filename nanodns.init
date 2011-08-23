@@ -1,0 +1,37 @@
+#!/bin/sh -e
+
+### BEGIN INIT INFO
+# Provides:          nanodns
+# Required-Start:
+# Required-Stop:
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start and stop nanodns
+# Description:       nanodns is a Domain Name Server (DNS)
+#        which translates ip addresses to and from internet names
+### END INIT INFO
+
+PATH=/usr/bin:/usr/local/bin
+
+. /lib/lsb/init-functions
+
+case "$1" in
+    start)
+	log_daemon_msg "Starting domain name service..." "nanodns"
+	nanodns
+	log_end_msg 0
+    ;;
+
+    stop)
+	log_daemon_msg "Stopping domain name service..." "nanodns"
+	killall nanodns
+	log_end_msg 0
+    ;;
+
+    *)
+	log_action_msg "Usage: /etc/init.d/bind9 {start|stop}"
+	exit 1
+    ;;
+esac
+
+exit 0
