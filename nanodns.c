@@ -13,15 +13,9 @@
 //#define DEBUG 
 
 #define DATA_SIZE	1024
-#define MSG_SIZE	DATA_SIZE + sizeof(DnsHeader)
+#define MSG_SIZE	DATA_SIZE + sizeof(HEADER)
 
 #pragma pack(1)
-
-typedef struct {
-	uint16_t id;
-	uint8_t a, b;
-	uint16_t qd, an, ns, ar;
-} DnsHeader;
 
 typedef struct {
 	uint16_t type;
@@ -36,7 +30,7 @@ typedef struct {
 
 typedef struct {
 	struct sockaddr_in from;
-	DnsHeader header;
+	HEADER header;
 	char data[DATA_SIZE];
 } DnsMessage;
 
@@ -114,7 +108,7 @@ short getType(char *query) {
 int receive(int sock, DnsMessage *msg) {
 	socklen_t f = sizeof(struct sockaddr_in);
 	int r = recvfrom(sock, &msg->header, MSG_SIZE, 0, (struct sockaddr*)&msg->from, &f);
-	return (r >= sizeof(DnsHeader)) && (r < MSG_SIZE);
+	return (r >= sizeof(HEADER)) && (r < MSG_SIZE);
 }
 
 #define qrLength(q) strlen(q) + 5
@@ -123,25 +117,27 @@ int rrLength(char *rr) {
 	return strlen(rr) + 11 + ntohs(*(short*)(rr + strlen(rr) + 9));
 }
 
-int rrCount(DnsMessage *msg) {
-	DnsHeader *h = &msg->header;
-	return ntohs(h->an) + ntohs(h->ns) + ntohs(h->ar);
-}
+#define rrCount(h) (ntohs((h).ancount) + ntohs((h).nscount) + ntohs((h).arcount))
 
 int messageLength(DnsMessage *msg) {
 	int i, offset = 0;
-	for (i = 0; i < ntohs(msg->header.qd); i++)
+	for (i = 0; i < ntohs(msg->header.qdcount); i++)
 		offset += qrLength(msg->data + offset);
-	for (i = 0; i < rrCount(msg); i++)
+	for (i = 0; i < rrCount(msg->header); i++)
 		offset += rrLength(msg->data + offset);
 	return offset;
 }
 
-void reply(int sock, DnsMessage *msg, int errCode, int aa) {
-	int op = (msg->header.a >> 3) & 7;
-	msg->header.a = 0x80 | (op << 3) | (aa ? 4 : 0);
-	msg->header.b = errCode & 0x0F;
-	sendto(sock, &msg->header, sizeof(DnsHeader) + messageLength(msg), 0, (struct sockaddr*)&msg->from, sizeof(struct sockaddr_in)); 
+void reply(int sock, DnsMessage *msg, ns_rcode errCode, int aa) {
+	msg->header.qr = 1;
+	msg->header.aa = aa;
+	msg->header.tc = 0;
+	msg->header.rd = 0;
+	msg->header.ra = 1;
+	msg->header.ad = 0;
+	msg->header.cd = 0;
+	msg->header.rcode = errCode;
+	sendto(sock, &msg->header, sizeof(HEADER) + messageLength(msg), 0, (struct sockaddr*)&msg->from, sizeof(struct sockaddr_in)); 
 }
 
 void append(DnsMessage *msg, char *query, Record *rec) {
@@ -168,7 +164,7 @@ void append(DnsMessage *msg, char *query, Record *rec) {
 	default:
 		answer->length = 0;
 	}
-	msg->header.an = htons(ntohs(msg->header.an) + 1);
+	msg->header.ancount = htons(ntohs(msg->header.ancount) + 1);
 }
 
 int rrA(Record *rec, char *host) {	
@@ -223,6 +219,10 @@ int search(DnsMessage *msg, Zone *zone, char *sub, int type, int direct, int fak
 	return r;
 }
 
+int isBadHead(HEADER *h) {
+	return h->qr || h->opcode || h->tc || rrCount(*h) || (ntohs(h->qdcount) != 1);
+}
+
 void run(int sock) {
         Zone *zone;
         char sub[DATA_SIZE];
@@ -230,7 +230,7 @@ void run(int sock) {
         while (1) {
                 if (!receive(sock, &msg))
                         continue;
-                if ((ntohs(msg.header.qd) != 1) || (rrCount(&msg) != 0) || (msg.header.a & 0xFE) || msg.header.b || (getClass(msg.data) != 1)) {
+                if (isBadHead(&msg.header) || (getClass(msg.data) != ns_c_in)) {
                         reply(sock, &msg, ns_r_notimpl, 0);
                         continue;
                 }
