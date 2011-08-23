@@ -11,7 +11,7 @@
 #include "config.h"
 #include "const.h"
 
-/* #define DEBUG */
+// #define DEBUG 
 
 #define DATA_SIZE	1024
 #define MSG_SIZE	DATA_SIZE + sizeof(DnsHeader)
