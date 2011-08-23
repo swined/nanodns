@@ -227,16 +227,11 @@ void append(DnsMessage *msg, char *query, Record *rec) {
 
 int initFakeRec(Record *rec, char *data) {
 	struct hostent *he;
-	char *a;
-	printf("initFakeRec(%s)\n", data);
 	switch (rec->type) {
 		case TYPE_A: 
 			he = gethostbyname(data);
-			if (he) {
-				a = inet_ntoa(*(struct in_addr*)(he->h_addr_list));
-				printf("a = %s\n", a);
-				strcpy(rec->data, a);
-			}
+			if (he)
+				strcpy(rec->data, inet_ntoa(*(struct in_addr*)(he->h_addr_list)));
 			return he != 0;
 		default: return 0;
 	}
