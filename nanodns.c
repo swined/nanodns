@@ -19,17 +19,17 @@
 #pragma pack(1)
 
 typedef struct {
-	unsigned short id;
-	unsigned char a, b;
-	unsigned short qd, an, ns, ar;
+	uint16_t id;
+	uint8_t a, b;
+	uint16_t qd, an, ns, ar;
 } DnsHeader;
 
 typedef struct {
-	unsigned short type;
-	unsigned short class;
-	unsigned long ttl;
-	unsigned short length;
-	char data[1];
+	uint16_t type;
+	uint16_t class;
+	uint32_t ttl;
+	uint16_t length;
+	char data[0];
 } Answer;
 
 typedef struct {

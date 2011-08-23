@@ -1,15 +1,17 @@
 #ifndef _CONFIG_H
 #define _CONFIG_H
 
+#include <stdint.h>
+
 typedef struct {
-	short type;
+	uint16_t type;
 	char *mask;
 	char *data;
 } Record;
 
 typedef struct {
 	char *name;
-	unsigned int length;
+	uint16_t length;
 	Record *records;
 } Zone;
 
