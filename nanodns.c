@@ -104,6 +104,14 @@ int findChar(char *s, char c) {
 	return o;
 }
 
+
+void dots(char *str) {
+	int i;
+        for (i = 0; i < strlen(str); i++)
+                if (str[i] == '.')
+                        str[i] = findChar(str + i + 1, '.');
+}
+
 int qnameEqualsStr(char *name, char *str) {
 	int so = findChar(str, '.');
 	if (so != name[0])
@@ -189,10 +197,11 @@ void reply(int sock, DnsMessage *msg, int errCode, int aa) {
 }
 
 void append(DnsMessage *msg, char *query, Record *rec) {
-	int i, offset = messageLength(msg);
+	int offset = messageLength(msg);
 	short *rdlen;
 	char *rddata;
 	strcpy(msg->data + offset, query);
+	dots(msg->data + offset);
 	offset += strlen(query) + 1;
 	*(short*)(msg->data + offset) = htons(rec->type);
 	*(short*)(msg->data + offset + 2) = htons(CLASS_IN);
@@ -208,9 +217,7 @@ void append(DnsMessage *msg, char *query, Record *rec) {
 	case TYPE_CNAME:
 		*rdlen = htons(strlen(rec->data) + 1);
 		strcpy(rddata, rec->data);
-		for (i = 0; i < strlen(rddata); i++)
-			if (rddata[i] == '.')
-				rddata[i] = findChar(rddata + i + 1, '.');
+		dots(rddata);
 		break;
 	default:
 		*rdlen = 0;
@@ -220,11 +227,16 @@ void append(DnsMessage *msg, char *query, Record *rec) {
 
 int initFakeRec(Record *rec, char *data) {
 	struct hostent *he;
+	char *a;
+	printf("initFakeRec(%s)\n", data);
 	switch (rec->type) {
 		case TYPE_A: 
 			he = gethostbyname(data);
-			if (he)
-				strcpy(rec->data, inet_ntoa(*(struct in_addr*)(he->h_addr_list)));
+			if (he) {
+				a = inet_ntoa(*(struct in_addr*)(he->h_addr_list));
+				printf("a = %s\n", a);
+				strcpy(rec->data, a);
+			}
 			return he != 0;
 		default: return 0;
 	}
@@ -247,7 +259,7 @@ int search(DnsMessage *msg, Zone *zone, char *sub, int type, int direct, int fak
 					r--;
 					continue;
 				}
-				append(msg, zone->records[i].data + 1, &fakeRec);
+				append(msg, zone->records[i].data, &fakeRec);
 				break;
 			}
 		}
