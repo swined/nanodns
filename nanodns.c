@@ -5,28 +5,12 @@
 #include <stdio.h>
 #include <netdb.h>
 #include "config.h"
+#include "const.h"
+
+/* #define DEBUG */
 
 #define DATA_SIZE	1024
 #define MSG_SIZE	DATA_SIZE + sizeof(DnsHeader)
-
-#define ERR_OK 0
-#define ERR_FORMAT 1
-#define ERR_SERVFAIL 2
-#define ERR_NXDOMAIN 3
-#define ERR_NOTIMPL 4
-#define ERR_REFUSED 5
-
-#define CLASS_IN	1
-
-#define TYPE_A               1
-#define TYPE_NS              2
-#define TYPE_CNAME           5
-/*#define TYPE_SOA             6
-#define TYPE_PTR             12
-#define TYPE_MX              15
-#define TYPE_TXT             16*/
-
-#define ZONE(name, recs) { name, sizeof(recs) / sizeof(Record), recs }
 
 #pragma pack(1)
 
@@ -35,6 +19,14 @@ typedef struct {
 	unsigned char a, b;
 	unsigned short qd, an, ns, ar;
 } DnsHeader;
+
+typedef struct {
+	unsigned short type;
+	unsigned short class;
+	unsigned long ttl;
+	unsigned short length;
+	char data[1];
+} Answer;
 
 typedef struct {
 	struct sockaddr_in from;
@@ -148,63 +140,64 @@ void reply(int sock, DnsMessage *msg, int errCode, int aa) {
 
 void append(DnsMessage *msg, char *query, Record *rec) {
 	int offset = messageLength(msg);
-	short *rdlen;
-	char *rddata;
+	Answer *answer; 
 	strcpy(msg->data + offset, query);
 	dots(msg->data + offset);
 	offset += strlen(query) + 1;
-	*(short*)(msg->data + offset) = htons(rec->type);
-	*(short*)(msg->data + offset + 2) = htons(CLASS_IN);
-	*(int*)(msg->data + offset + 4) = htons(TTL);
-        rdlen = (short*)(msg->data + offset + 8);
-        rddata = msg->data + offset + 10;
+	answer = (Answer*)(msg->data + offset);
+	answer->type = htons(rec->type);
+	answer->class = htons(CLASS_IN);
+	answer->ttl = htonl(TTL);
 	switch (rec->type) {
 	case TYPE_A:
-		*rdlen = htons(4);
-		*(int*)rddata = inet_addr(rec->data);
+		answer->length = htons(4);
+		*(int*)(answer->data) = inet_addr(rec->data);
 		break;
 	case TYPE_NS:
 	case TYPE_CNAME:
-		*rdlen = htons(strlen(rec->data) + 1);
-		strcpy(rddata, rec->data);
-		dots(rddata);
+		answer->length = htons(strlen(rec->data) + 1);
+		strcpy(answer->data, rec->data);
+		dots(answer->data);
 		break;
 	default:
-		*rdlen = 0;
+		answer->length = 0;
 	}
 	msg->header.an = htons(ntohs(msg->header.an) + 1);
 }
 
-int initFakeRec(Record *rec, char *data) {
-	struct hostent *he;
-	switch (rec->type) {
-		case TYPE_A: 
-			he = gethostbyname(data);
-			if (he)
-				strcpy(rec->data, inet_ntoa(*(struct in_addr*)(he->h_addr_list)));
-			return he != 0;
-		default: return 0;
+int rrA(Record *rec, char *domain) {
+	struct hostent *he = gethostbyname(domain);
+	rec->type = TYPE_A;
+	rec->mask = "";
+	if (he)
+		rec->data = inet_ntoa(*(struct in_addr*)(he->h_addr_list));
+	return he != 0;
+		
+}
+
+int maskMatches(Record *rec, char *sub, int direct) {
+	if (direct) {
+		return !strcmp(rec->mask, sub);
+	} else {
+		return strlen(sub) && !strcmp(rec->mask, "*");
 	}
 }
 
 int search(DnsMessage *msg, Zone *zone, char *sub, int type, int direct, int fake) {
-	char fakeData[DATA_SIZE];
-	Record fakeRec = { 0, "", 0 };
+	Record recursive;
 	int i, r = 0;
-	fakeRec.type = type;
-	fakeRec.data = fakeData;
 	for (i = 0; i < zone->length; i++) {
 		if (zone->records[i].type != (fake ? TYPE_CNAME : type))
 			continue;
-		if (strcmp(zone->records[i].mask, direct ? sub : "*") == 0) {
+		if (maskMatches(&zone->records[i], sub, direct)) {
 			append(msg, msg->data, &zone->records[i]);
 			r++;
 			if (fake) {
-				if (!initFakeRec(&fakeRec, zone->records[i].data + 1)) {
+				if (!rrA(&recursive, zone->records[i].data + 1)) {
 					r--;
 					continue;
 				}
-				append(msg, zone->records[i].data, &fakeRec);
+				append(msg, zone->records[i].data, &recursive);
 				break;
 			}
 		}
@@ -212,7 +205,7 @@ int search(DnsMessage *msg, Zone *zone, char *sub, int type, int direct, int fak
 	if (!r) {
 		if (direct)
 			return search(msg, zone, sub, type, 0, fake);
-		if (!fake && (type != TYPE_CNAME))
+		if (!fake && (type == TYPE_A))
 			return search(msg, zone, sub, type, 1, 1);
 	}
 	return r;
@@ -222,7 +215,6 @@ void run(int sock) {
         Zone *zone;
         char sub[DATA_SIZE];
         DnsMessage msg;
-        int type;
         while (1) {
                 if (!receive(sock, &msg))
                         continue;
@@ -230,20 +222,31 @@ void run(int sock) {
                         reply(sock, &msg, ERR_NOTIMPL, 0);
                         continue;
                 }
+		#ifdef DEBUG
+		printf("query: %s (%d)\n", msg.data, getType(msg.data));
+		#endif
                 zone = findZone(msg.data, sub);
                 if (zone) {
-                        type = getType(msg.data);
-                        search(&msg, zone, sub, type, 1, 0);
+			#ifdef DEBUG
+			printf("zone: %s\n", zone->name);
+			#endif
+                        search(&msg, zone, sub, getType(msg.data), 1, 0);
                         reply(sock, &msg, ERR_OK, 1);
-                } else
+                } else {
+			#ifdef DEBUG
+			printf("no zone\n");
+			#endif
                         reply(sock, &msg, ERR_REFUSED, 0);
+		}
         } 
 }
 
 int main(int a, char **b) {
 	int sock;
+#ifndef DEBUG
 	if (fork())
 		return 0;
+#endif
 	sock = listenUdp(53);
 	if (sock) 
 		run(sock);

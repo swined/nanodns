@@ -46,4 +46,4 @@ Zone zones[] = {
 	ZONE("prooflink.org.", zone_ghs),
 };
 
-int zoneCount = sizeof(zones);
+int zoneCount = sizeof(zones) / sizeof(Record);
