@@ -1,7 +1,6 @@
 #ifndef _CONFIG_H
 #define _CONFIG_H
 
-#include <stdint.h>
 #include <arpa/nameser.h> 
 
 typedef struct {
@@ -12,7 +11,7 @@ typedef struct {
 
 typedef struct {
 	char *name;
-	uint16_t length;
+	int length;
 	Record *records;
 } Zone;
 
