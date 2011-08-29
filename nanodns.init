@@ -18,7 +18,8 @@ PATH=/bin:/usr/bin:/usr/local/bin
 case "$1" in
     start)
 	log_daemon_msg "Starting domain name service..." "nanodns"
-	su nobody -c nanodns
+	#su nobody -c 
+	nanodns
 	log_end_msg 0
     ;;
 

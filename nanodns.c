@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include "config.h"
 
-//#define DEBUG 
+// #define DEBUG 
 
 #define DATA_SIZE	1024
 #define MSG_SIZE	DATA_SIZE + sizeof(HEADER)
