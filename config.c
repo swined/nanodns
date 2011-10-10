@@ -26,8 +26,8 @@ Record zone_sw_vg[] = {
 	DEFAULT_NS,
 	HOME_A,
 	GHS_CNAME,
-	{ ns_t_a, "lms.", "216.208.29.154" },
-/*	{ ns_t_cname, "lms.", ".deep.academ.org" },*/
+/*	{ ns_t_a, "lms.", "216.208.29.154" }, */
+	{ ns_t_cname, "lms.", ".deep.academ.org" },
 };
 
 Record zone_swined_org[] = {
